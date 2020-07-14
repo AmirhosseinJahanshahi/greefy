@@ -2,6 +2,7 @@ from flask import Flask
 from flask import jsonify
 from flask_mysqldb import MySQL
 from flask import request
+import datetime
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -45,21 +46,29 @@ def get_user_data(username, email):
     return response
 
 
-@app.route('/api/v1.0/user_login/', methods=['POST'])
+@app.route('/api/v1.0/user_plays_music/<int:user_id>/<int:music_id>', methods=['GET'])
+def user_plays_music(user_id, music_id):
+    now = datetime.datetime.utcnow()
+    response = cud_query_db("INSERT INTO user_plays_music (user_id,music_id,music_date_time_played) VALUES (%s,%s,%s)",
+                            (user_id, music_id, now.strftime('%Y-%m-%d %H:%M:%S')))
+    return response
+
+
+@app.route('/api/v1.0/user_login', methods=['POST'])
 def user_login():
     data = request.get_json()
     username = data.get('username', '')
     return username
 
 
-@app.route('/api/v1.0/user_sign_up/', methods=['POST'])
+@app.route('/api/v1.0/user_sign_up', methods=['POST'])
 def user_signup():
     data = request.get_json()
     username = data.get('username', '')
     return username
 
 
-@app.route('/api/v1.0/remember_password/', methods=['POST'])
+@app.route('/api/v1.0/remember_password', methods=['POST'])
 def user_remember_password():
     data = request.form
     username = data.get('username')
@@ -70,13 +79,14 @@ def read_query_db(query, args=()):
     try:
         cur = mysql.connection.cursor()
         cur.execute(query, args)
-        rv = cur.fetchall()
+        columns = cur.description
+        rv = [{columns[index][0]: column for index, column in enumerate(value)} for value in cur.fetchall()]
         mysql.connection.commit()
         cur.close()
         if cur.rowcount <= 0:
             return jsonify(status="failed",
                            code=201,
-                           message="No user find!")
+                           message="No data found!")
         else:
             return jsonify(status="success",
                            code=200,
