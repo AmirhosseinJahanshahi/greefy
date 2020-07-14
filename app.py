@@ -1,50 +1,55 @@
 from flask import Flask
-import sqlite3
-from flask import g
-from flaskext.mysql import MySQL
+from flask import jsonify
+from flask_mysqldb import MySQL
 
 app = Flask(__name__)
-mysql = MySQL()
-app.config['MYSQL_DATABASE_USER'] = 'root'
-app.config['MYSQL_DATABASE_PASSWORD'] = ''
-app.config['MYSQL_DATABASE_DB'] = 'spotify'
-app.config['MYSQL_DATABASE_HOST'] = 'localhost'
-mysql.init_app(app)
-
-
-def connect_db():
-    return mysql.connect()
-
-
-@app.before_request
-def before_request():
-    g.db = connect_db()
-
-
-@app.teardown_request
-def teardown_request(exception):
-    if hasattr(g, 'db'):
-        g.db.close()
+app.config['JSON_SORT_KEYS'] = False
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = ''
+app.config['MYSQL_DB'] = 'spotify'
+mysql = MySQL(app)
 
 
 @app.route('/api/v1.0/', methods=['GET'])
 def hello_world():
-    # data = {'username': 'ali'}
-    # response = app.response_class(
-    #     response=json.dumps(data),
-    #     status=200,
-    #     mimetype="application/json"
-    # )
-    # response = query_db('select * from users')
-    return 'test'
+    response = read_query_db("SELECT * FROM admin")
+    return response
 
 
-def query_db(query, args=(), one=False):
-    cur = g.db.cursor()
-    cur.execute(query, args)
-    rv = [dict((cur.description[idx][0], value)
-               for idx, value in enumerate(row)) for row in cur.fetchall()]
-    return (rv[0] if rv else None) if one else rv
+def read_query_db(query, args=()):
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute(query, args)
+        rv = cur.fetchall()
+        mysql.connection.commit()
+        cur.close()
+        return jsonify(status="success",
+                       code=200,
+                       message="edited!",
+                       content=rv)
+    except Exception as e:
+        cur.close()
+        return jsonify(status="failed",
+                       code=201,
+                       message=str(e))
+
+
+def cud_query_db(query, args=()):
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute(query, args)
+        mysql.connection.commit()
+        cur.close()
+        return jsonify(status="success",
+                       code=200,
+                       message="edited!")
+    except Exception as e:
+        cur.close()
+        return jsonify(status="failed",
+                       code=201,
+                       message=str(e))
+
 
 
 if __name__ == '__main__':
