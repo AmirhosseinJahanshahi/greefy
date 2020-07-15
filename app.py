@@ -57,11 +57,58 @@ def user_plays_music(user_id, music_id):
     return response
 
 
+@app.route('/api/v1.0/user_add_music_to_playlist/<int:playlist_id>/<int:music_id>/<int:user_id>', methods=['GET'])
+def user_add_music_to_playlist(playlist_id, music_id, user_id):
+    now = datetime.datetime.utcnow()
+    response = cud_query_db(
+        "INSERT INTO playlist_has_music (playlist_id,music_id,user_id,music_added_date) VALUES (%s,%s,%s,%s)",
+        (playlist_id, music_id, user_id, now.strftime('%Y-%m-%d')))
+    return response
+
+
+@app.route('/api/v1.0/user_delete_music_from_playlist/<int:playlist_id>/<int:music_id>/<int:user_id>', methods=['GET'])
+def user_delete_music_from_playlist(playlist_id, music_id, user_id):
+    response = cud_query_db(
+        "DELETE FROM playlist_has_music WHERE  playlist_id = (%s) AND music_id = (%s) AND user_id = (%s)",
+        (playlist_id, music_id, user_id,))
+    return response
+
+
+@app.route('/api/v1.0/user_add_playlist/<int:user_id>/<title>', methods=['GET'])
+def user_add_playlist(user_id, title):
+    now = datetime.datetime.utcnow()
+    response1 = cud_query_db(
+        "INSERT INTO playlist(title,last_update,created_date) VALUES (%s,%s,%s)",
+        (title, now.strftime('%Y-%m-%d'), now.strftime('%Y-%m-%d')))
+    playlist_id = read_field_query_db("SELECT id FROM playlist WHERE title = (%s)",
+                                      (title,))
+    response2 = cud_query_db(
+        "INSERT INTO user_creates_playlist(user_id,playlist_id,created_date) VALUES (%s,%s,%s)",
+        (user_id, playlist_id, now.strftime('%Y-%m-%d')))
+    return response2
+
+
+@app.route('/api/v1.0/user_delete_playlist/<int:playlist_id>/<int:music_id>/<int:user_id>', methods=['GET'])
+def user_delete_playlist(playlist_id, music_id, user_id):
+    response = cud_query_db(
+        "DELETE FROM playlist_has_music WHERE  playlist_id = (%s) AND music_id = (%s) AND user_id = (%s)",
+        (playlist_id, music_id, user_id,))
+    return response
+
+
 @app.route('/api/v1.0/user_plays_music_number/<int:user_id>/<int:music_id>', methods=['GET'])
 def user_plays_music_number(user_id, music_id):
     response = read_field_query_db(
-        "SELECT COUNT(*) FROM user_plays_music WHERE user_id = (%s) AND music_id = (%s) AND music_date_played BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 1 DAY)",
+        "SELECT COUNT(*) FROM user_plays_music WHERE user_id = (%s) AND music_id = (%s) AND music_date_played BETWEEN CURDATE() - INTERVAL 1 DAY AND CURDATE()",
         (user_id, music_id))
+    return response
+
+
+@app.route('/api/v1.0/user_plays_music_number/<int:user_id>/<int:playlist_id>', methods=['GET'])
+def user_plays_playlist_number(user_id, playlist_id):
+    response = read_field_query_db(
+        "SELECT COUNT(*) FROM user_creates_playlist WHERE user_id = (%s) AND playlist_id = (%s)",
+        (user_id, playlist_id))
     return response
 
 
