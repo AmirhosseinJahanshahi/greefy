@@ -3,10 +3,7 @@ from flask import jsonify
 from flask_mysqldb import MySQL
 from flask import request
 import datetime
-import hashlib
-import os
-import binascii
-import json
+from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -15,6 +12,7 @@ app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
 app.config['MYSQL_DB'] = 'spotify'
 mysql = MySQL(app)
+bcrypt = Bcrypt()
 
 
 @app.route('/api/v1.0/user_likes_music/<int:user_id>/<int:music_id>', methods=['GET'])
@@ -71,9 +69,17 @@ def user_plays_music_number(user_id, music_id):
 def listener_login():
     data = request.get_json()
     username = data.get('username', '')
+    password = data.get('password', '')
     response = read_field_query_db("SELECT password FROM listener WHERE username = (%s)",
-                                   (username,))
-    return response
+                                   (username,))[1:-1]
+    if verify_password(response, password):
+        return jsonify(status="success",
+                       code=200,
+                       message="success login")
+    else:
+        return jsonify(status="failed",
+                       code=201,
+                       message="login error!")
 
 
 @app.route('/api/v1.0/listener_sign_up', methods=['POST'])
@@ -112,24 +118,11 @@ def artist_signup():
 
 
 def hash_password(password):
-    salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
-    hashed_password = hashlib.pbkdf2_hmac('sha512',
-                                          password.encode('utf-8'),
-                                          salt,
-                                          100000)
-    hashed_password = binascii.hexlify(hashed_password)
-    return (salt + hashed_password).decode('ascii')
+    return bcrypt.generate_password_hash(password)
 
 
 def verify_password(stored_password, provided_password):
-    salt = stored_password[:64]
-    stored_password = stored_password[64:]
-    hashed_password = hashlib.pbkdf2_hmac('sha512',
-                                          provided_password.encode('utf-8'),
-                                          salt.encode('ascii'),
-                                          100000)
-    hashed_password = binascii.hexlify(hashed_password).decode('ascii')
-    return hashed_password == stored_password
+    return bcrypt.check_password_hash(stored_password, provided_password)
 
 
 @app.route('/api/v1.0/user_remember_password', methods=['POST'])
