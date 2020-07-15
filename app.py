@@ -4,6 +4,7 @@ from flask_mysqldb import MySQL
 from flask import request
 import datetime
 from flask_bcrypt import Bcrypt
+import json
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -17,14 +18,45 @@ bcrypt = Bcrypt()
 
 @app.route('/api/v1.0/user_likes_music/<int:user_id>/<int:music_id>', methods=['GET'])
 def user_likes_music(user_id, music_id):
+    now = datetime.datetime.utcnow()
     response = cud_query_db("INSERT INTO user_likes_music (user_id,music_id) VALUES (%s,%s)", (user_id, music_id))
-    return response
+    playlist_id = read_field_query_db("SELECT id FROM playlist WHERE title = (%s)",
+                                      ("Liked Songs",))
+    add_to_liked_playlist = cud_query_db(
+        "INSERT INTO playlist_has_music (playlist_id,music_id,user_id,music_added_date) VALUES (%s,%s,%s,%s)",
+        (playlist_id, music_id, user_id, now.strftime('%Y-%m-%d')))
+    return add_to_liked_playlist
 
 
 @app.route('/api/v1.0/user_unlikes_music/<int:user_id>/<int:music_id>', methods=['GET'])
 def user_unlikes_music(user_id, music_id):
     response = cud_query_db("DELETE FROM user_likes_music WHERE user_id = %s AND music_id = %s", (user_id, music_id))
-    return response
+    playlist_id = read_field_query_db("SELECT id FROM playlist WHERE title = (%s)",
+                                      ("Liked Songs",))
+    delete_from_liked_playlist = cud_query_db(
+        "DELETE FROM playlist_has_music WHERE playlist_id= %s AND music_id = %s AND user_id = %s",
+        (playlist_id, music_id, user_id))
+    return delete_from_liked_playlist
+
+
+@app.route('/api/v1.0/user_likes_playlist/<int:user_id>/<int:playlist_id>', methods=['GET'])
+def user_likes_playlist(user_id, playlist_id):
+    response = cud_query_db("INSERT INTO user_likes_playlist (user_id,playlist_id) VALUES (%s,%s)",
+                            (user_id, playlist_id))
+    add_to_shares_playlist = cud_query_db(
+        "INSERT INTO user_shares_playlist (user_id,playlist_id) VALUES (%s,%s)",
+        (user_id, playlist_id,))
+    return add_to_shares_playlist
+
+
+@app.route('/api/v1.0/user_unlikes_playlist/<int:user_id>/<int:playlist_id>', methods=['GET'])
+def user_unlikes_playlist(user_id, playlist_id):
+    response = cud_query_db("DELETE FROM user_likes_playlist WHERE user_id = %s AND playlist = %s",
+                            (user_id, playlist_id))
+    delete_from_shares_playlist = cud_query_db(
+        "DELETE FROM user_shares_playlist WHERE playlist_id= %s AND user_id = %s",
+        (playlist_id, user_id))
+    return delete_from_shares_playlist
 
 
 @app.route('/api/v1.0/user_follows/<int:first_user_id>/<int:second_user_id>', methods=['GET'])
@@ -85,14 +117,51 @@ def user_add_playlist(user_id, title):
     response2 = cud_query_db(
         "INSERT INTO user_creates_playlist(user_id,playlist_id,created_date) VALUES (%s,%s,%s)",
         (user_id, playlist_id, now.strftime('%Y-%m-%d')))
-    return response2
+    response3 = cud_query_db(
+        "INSERT INTO user_shares_playlist(user_id,playlist_id) VALUES (%s,%s)",
+        (user_id, playlist_id))
+    return response3
 
 
-@app.route('/api/v1.0/user_delete_playlist/<int:playlist_id>/<int:music_id>/<int:user_id>', methods=['GET'])
+@app.route('/api/v1.0/user_shares_playlist/<int:playlist_id>/<int:user_id>', methods=['GET'])
+def user_shares_playlist(user_id, playlist_id):
+    response3 = cud_query_db(
+        "INSERT INTO user_shares_playlist(user_id,playlist_id) VALUES (%s,%s)",
+        (user_id, playlist_id))
+    return response3
+
+
+@app.route('/api/v1.0/user_update_playlist/<old_title>/<new_title>', methods=['GET'])
+def user_update_playlist(old_title, new_title):
+    now = datetime.datetime.utcnow()
+    playlist_id = read_field_query_db("SELECT id FROM playlist WHERE title = (%s)",
+                                      (old_title,))
+    response = cud_query_db(
+        "UPDATE playlist SET title = (%s),last_update = (%s) WHERE id = (%s)",
+        (new_title, now.strftime('%Y-%m-%d'), playlist_id))
+    return response
+
+
+@app.route('/api/v1.0/user_edit_playlist/<int:playlist_id>/<int:music_id>/<int:user_id>', methods=['GET'])
 def user_delete_playlist(playlist_id, music_id, user_id):
     response = cud_query_db(
         "DELETE FROM playlist_has_music WHERE  playlist_id = (%s) AND music_id = (%s) AND user_id = (%s)",
         (playlist_id, music_id, user_id,))
+    return response
+
+
+@app.route('/api/v1.0/user_report_music_to_admin/<int:music_id>', methods=['GET'])
+def user_report_music_to_admin(music_id):
+    response3 = cud_query_db(
+        "INSERT INTO reported_music (reportedmusic_id) VALUES (%s)",
+        (music_id,))
+    return response3
+
+
+@app.route('/api/v1.0/get_user_playlists/<int:user_id>', methods=['GET'])
+def get_user_playlists(user_id):
+    response = read_query_db("SELECT * FROM user_shares_playlist WHERE user_id = (%s)",
+                             (user_id,))
     return response
 
 
@@ -101,6 +170,13 @@ def user_plays_music_number(user_id, music_id):
     response = read_field_query_db(
         "SELECT COUNT(*) FROM user_plays_music WHERE user_id = (%s) AND music_id = (%s) AND music_date_played BETWEEN CURDATE() - INTERVAL 1 DAY AND CURDATE()",
         (user_id, music_id))
+    return response
+
+
+@app.route('/api/v1.0/playlist_data/<int:playlist_id>', methods=['GET'])
+def get_playlist_data(playlist_id):
+    response = read_query_db("SELECT * FROM playlist WHERE id = (%s)",
+                             (playlist_id,))
     return response
 
 
@@ -147,8 +223,24 @@ def listener_signup():
     return response
 
 
-@app.route('/api/v1.0/artist_sign_up', methods=['POST'])
-def artist_signup():
+@app.route(
+    '/api/v1.0/change_user_to_premium/<int:user_id>/days=<int:days>&credit_card=<credit_card>&credit_expiration=<credit_expiration>',
+    methods=['GET'])
+def change_user_to_premium(user_id, days, credit_card, credit_expiration):
+    now = datetime.datetime.utcnow()
+    add_to_premium = cud_query_db(
+        "INSERT INTO premium (listener_id , days) VALUES (%s,%s)",
+        (user_id, days))
+    response = cud_query_db(
+        "UPDATE listener SET premium_days = (%s),credit_card = (%s),credit_expiration = (%s),buying_date = (%s) "
+        "WHERE id = (%s)",
+        (days, credit_card, credit_expiration, now.strftime('%Y-%m-%d'), user_id))
+    return response
+
+
+
+@app.route('/api/v1.0/artist_sign_up_accept', methods=['POST'])
+def artist_signup_accept():
     data = request.get_json()
     username = data.get('username', '')
     email = data.get('email', '')
