@@ -3,6 +3,10 @@ from flask import jsonify
 from flask_mysqldb import MySQL
 from flask import request
 import datetime
+import hashlib
+import os
+import binascii
+import json
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -49,30 +53,124 @@ def get_user_data(username, email):
 @app.route('/api/v1.0/user_plays_music/<int:user_id>/<int:music_id>', methods=['GET'])
 def user_plays_music(user_id, music_id):
     now = datetime.datetime.utcnow()
-    response = cud_query_db("INSERT INTO user_plays_music (user_id,music_id,music_date_time_played) VALUES (%s,%s,%s)",
-                            (user_id, music_id, now.strftime('%Y-%m-%d %H:%M:%S')))
+    response = cud_query_db(
+        "INSERT INTO user_plays_music (user_id,music_id,music_date_played,music_time_played) VALUES (%s,%s,%s,%s)",
+        (user_id, music_id, now.strftime('%Y-%m-%d'), now.strftime('%H:%M:%S')))
     return response
 
 
-@app.route('/api/v1.0/user_login', methods=['POST'])
-def user_login():
+@app.route('/api/v1.0/user_plays_music_number/<int:user_id>/<int:music_id>', methods=['GET'])
+def user_plays_music_number(user_id, music_id):
+    response = read_field_query_db(
+        "SELECT COUNT(*) FROM user_plays_music WHERE user_id = (%s) AND music_id = (%s) AND music_date_played BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 1 DAY)",
+        (user_id, music_id))
+    return response
+
+
+@app.route('/api/v1.0/listener_login', methods=['POST'])
+def listener_login():
     data = request.get_json()
     username = data.get('username', '')
-    return username
+    response = read_field_query_db("SELECT password FROM listener WHERE username = (%s)",
+                                   (username,))
+    return response
 
 
-@app.route('/api/v1.0/user_sign_up', methods=['POST'])
-def user_signup():
+@app.route('/api/v1.0/listener_sign_up', methods=['POST'])
+def listener_signup():
     data = request.get_json()
     username = data.get('username', '')
-    return username
+    email = data.get('email', '')
+    password = hash_password(data.get('password', ''))
+    first_name = data.get('first_name', '')
+    last_name = data.get('last_name', '')
+    birth_year = data.get('birth_year', '')
+    nationality = data.get('nationality', '')
+    q_number = data.get('q_number', '')
+    q_value = data.get('q_value', '')
+    response = cud_query_db(
+        "INSERT INTO listener (username,email,password,first_name,last_name,birth_year,nationality,q_number,q_value) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (username, email, password, first_name, last_name, birth_year, nationality, q_number, q_value))
+    return response
 
 
-@app.route('/api/v1.0/remember_password', methods=['POST'])
+@app.route('/api/v1.0/artist_sign_up', methods=['POST'])
+def artist_signup():
+    data = request.get_json()
+    username = data.get('username', '')
+    email = data.get('email', '')
+    password = hash_password(data.get('password', ''))
+    artistic_name = data.get('artistic_name', '')
+    start_date = data.get('start_date', '')
+    nationality = data.get('nationality', '')
+    q_number = data.get('q_number', '')
+    q_value = data.get('q_value', '')
+    response = cud_query_db(
+        "INSERT INTO artist (username,email,password,artistic_name,start_date,nationality,q_number,q_value) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+        (username, email, password, artistic_name, start_date, nationality, q_number, q_value))
+    return response
+
+
+def hash_password(password):
+    salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
+    hashed_password = hashlib.pbkdf2_hmac('sha512',
+                                          password.encode('utf-8'),
+                                          salt,
+                                          100000)
+    hashed_password = binascii.hexlify(hashed_password)
+    return (salt + hashed_password).decode('ascii')
+
+
+def verify_password(stored_password, provided_password):
+    salt = stored_password[:64]
+    stored_password = stored_password[64:]
+    hashed_password = hashlib.pbkdf2_hmac('sha512',
+                                          provided_password.encode('utf-8'),
+                                          salt.encode('ascii'),
+                                          100000)
+    hashed_password = binascii.hexlify(hashed_password).decode('ascii')
+    return hashed_password == stored_password
+
+
+@app.route('/api/v1.0/user_remember_password', methods=['POST'])
 def user_remember_password():
     data = request.form
     username = data.get('username')
     return username
+
+
+@app.route('/api/v1.0/user_update_account', methods=['POST'])
+def user_update_account():
+    data = request.form
+    username = data.get('username')
+    return username
+
+
+@app.route('/api/v1.0/user_delete_account', methods=['POST'])
+def user_delete_account():
+    data = request.form
+    username = data.get('username')
+    return username
+
+
+def read_field_query_db(query, args=()):
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute(query, args)
+        rv = cur.fetchone()
+        mysql.connection.commit()
+        cur.close()
+        if cur.rowcount <= 0:
+            return jsonify(status="failed",
+                           code=201,
+                           message="No data found!")
+        else:
+            return str(rv)[1:str(rv).index(',')]
+    except Exception as e:
+        cur.close()
+        return jsonify(status="failed",
+                       code=201,
+                       message=str(e))
 
 
 def read_query_db(query, args=()):
