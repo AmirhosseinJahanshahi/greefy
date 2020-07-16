@@ -161,10 +161,10 @@ def user_delete_album(album_id):
 
 @app.route('/api/v1.0/user_report_music_to_admin/<int:music_id>', methods=['GET'])
 def user_report_music_to_admin(music_id):
-    response3 = cud_query_db(
+    response = cud_query_db(
         "INSERT INTO reported_music (reportedmusic_id) VALUES (%s)",
         (music_id,))
-    return response3
+    return response
 
 
 @app.route('/api/v1.0/get_user_playlists/<int:user_id>', methods=['GET'])
