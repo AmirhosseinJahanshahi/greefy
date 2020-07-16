@@ -169,13 +169,24 @@ def user_plays_playlist_number(user_id, playlist_id):
     return response
 
 
+@app.route('/api/v1.0/get_playlist_musics/<int:playlist_id>', methods=['GET'])
+def get_playlist_musics(playlist_id):
+    response = read_query_db(
+        "SELECT music_id , music_added_date FROM playlist_has_music WHERE  playlist_id = (%s) ",
+        (playlist_id,))
+    return response
+
+
 # ------------------------------EndPlaylist------------------------------ #
 
-# ------------------------------User------------------------------ #
+# ------------------------------Search------------------------------ #
 @app.route('/api/v1.0/search/<search_text>', methods=['GET'])
 def search(search_text):
     response = search_query_db(search_text)
     return response
+
+
+# ------------------------------EndSearch------------------------------ #
 
 
 # ------------------------------User------------------------------ #
@@ -186,18 +197,68 @@ def user_follow(first_user_id, second_user_id):
     return response
 
 
-@app.route('/api/v1.0/user_follows/<int:user_id>/<int:music_id>', methods=['GET'])
+@app.route('/api/v1.0/user_unfollows/<int:first_user_id>/<int:second_user_id>', methods=['GET'])
 def user_unfollow(first_user_id, second_user_id):
     response = cud_query_db("DELETE FROM user_follows WHERE firstuser_id = %s AND seconduser_id = %s",
                             (first_user_id, second_user_id))
     return response
 
 
-@app.route('/api/v1.0/get_user/username=<username>&email=<email>/', methods=['GET'])
+@app.route('/api/v1.0/get_user_data/username=<username>&email=<email>/', methods=['GET'])
 def get_user_data(username, email):
     response = read_query_db("SELECT * FROM listener WHERE username = (%s) AND email = (%s)",
                              (username, email))
     return response
+
+
+@app.route('/api/v1.0/get_user_profile/username=<username>&email=<email>,<user_type>/', methods=['GET'])
+def get_user_profile(username, email, user_type):
+    if user_type == 'artist':
+        pass
+
+    elif user_type == 'listener':
+        pass
+    else:
+        response = """{
+                    status:"failed"
+                    code=201
+                    error:'type is invalid!'
+                   }
+                    """
+    return response
+
+
+@app.route('/api/v1.0/get_user_followers/<int:user_id>', methods=['GET'])
+def get_user_followers(user_id):
+    response = read_query_db("SELECT firstuser_id FROM user_follows WHERE seconduser_id = (%s)",
+                             (user_id,))
+    return response
+
+
+@app.route('/api/v1.0/get_user_followings/<int:user_id>', methods=['GET'])
+def get_user_followings(user_id):
+    response = read_query_db("SELECT seconduser_id FROM user_follows WHERE firstuser_id = (%s)",
+                             (user_id,))
+    return response
+
+
+@app.route('/api/v1.0/get_last_music_followers_play/<int:user_id>', methods=['GET'])
+def get_last_music_followers_play(user_id):
+    response = read_query_db("SELECT firstuser_id FROM user_follows WHERE seconduser_id = (%s)",
+                             (user_id,))
+    result = json.loads(response.get_data().decode("utf-8"))['content']
+    temp = list()
+    final_list = list()
+    for x in result:
+        temp.append(x['firstuser_id'])
+    for i in range(len(temp)):
+        find_music = read_query_db(
+            "SELECT music_id FROM user_plays_music WHERE user_id = (%s) AND music_date_played IN (SELECT max(music_date_played) FROM user_plays_music) ORDER BY music_time_played desc limit 1 offset 1"
+            , (temp.__getitem__(i),))
+        final_result = json.loads(find_music.get_data().decode("utf-8"))
+        if final_result['code'] == 200:
+            final_list.append(final_result['content'])
+    return str(final_list)
 
 
 # ------------------------------EndUser------------------------------ #
@@ -217,6 +278,14 @@ def user_delete_album(album_id):
     # TODO
     response = cud_query_db(
         "DELETE FROM album WHERE  album_id = (%s)",
+        (album_id,))
+    return response
+
+
+@app.route('/api/v1.0/get_album_musics/<int:album_id>', methods=['GET'])
+def get_album_musics(album_id):
+    response = read_query_db(
+        "SELECT title, duration FROM music WHERE  album_id = (%s) ",
         (album_id,))
     return response
 
@@ -344,6 +413,24 @@ def change_user_to_premium(user_id, days, credit_card, credit_expiration):
     return response
 
 
+@app.route(
+    '/api/v1.0/change_user_to_free/<int:user_id>',
+    methods=['GET'])
+def change_user_to_free(user_id):
+    delete_from_premium = cud_query_db(
+        "DELETE FROM premium WHERE listener_id = (%s)",
+        (user_id,))
+    response = cud_query_db(
+        "UPDATE listener SET premium_days = (%s),credit_card = (%s),credit_expiration = (%s),buying_date = (%s) "
+        "WHERE id = (%s)",
+        (0, "", "", "", user_id))
+    return response
+
+
+# TODO
+# subtract premium days
+
+
 # ------------------------------EndPremium------------------------------ #
 
 
@@ -442,6 +529,76 @@ def search_query_db(search_text):
         return jsonify(status="failed",
                        code=201,
                        message=str(e))
+
+
+# TODO
+# def user_info_query_db(user_id, username, email):
+#     try:
+#         cur = mysql.connection.cursor()
+#         # user query
+#         cur.execute("SELECT username, first_name FROM listener WHERE username = (%s) AND email = (%s)",
+#                     (username, email))
+#         user_result = cur.fetchall()
+#         mysql.connection.commit()
+#         if cur.rowcount <= 0:
+#             user_message = "No data found!"
+#         else:
+#             user_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
+#                                 user_result]
+#         # following query
+#         cur.execute("SELECT seconduser_id FROM user_follows WHERE firstuser_id = (%s)",
+#                     (user_id,))
+#         following_result = cur.fetchall()
+#         mysql.connection.commit()
+#         if cur.rowcount <= 0:
+#             following_message = "No data found!"
+#         else:
+#             following_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
+#                               following_result]
+#         # follower query
+#         cur.execute("SELECT firstuser_id FROM user_follows WHERE seconduser_id = (%s)",
+#                     (user_id,))
+#         follower_result = cur.fetchall()
+#         mysql.connection.commit()
+#         if cur.rowcount <= 0:
+#             follower_message = "No data found!"
+#         else:
+#             follower_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
+#                              follower_result]
+#         # playlist query
+#         cur.execute("SELECT playlist_id FROM user_creates_playlist WHERE user_id = (%s)",
+#                     (user_id,))
+#         playlist_result = cur.fetchall()
+#         mysql.connection.commit()
+#         if cur.rowcount <= 0:
+#             playlist_message = "No data found!"
+#         else:
+#             playlist_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
+#                              playlist_result]
+#         # playlist_music query
+#         cur.execute("SELECT music_id, user_id FROM playlist_has_music WHERE playlist_id = (%s)",
+#                     (search_text,))
+#         playlist_result = cur.fetchall()
+#         mysql.connection.commit()
+#         if cur.rowcount <= 0:
+#             playlist_message = "No data found!"
+#         else:
+#             playlist_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
+#                                 playlist_result]
+#         cur.close()
+#         return jsonify(status="success",
+#                        code=200,
+#                        message="done!",
+#                        listener=listener_message,
+#                        artist=artist_message,
+#                        music=music_message,
+#                        album=album_message,
+#                        playlist=playlist_message, )
+#     except Exception as e:
+#         cur.close()
+#         return jsonify(status="failed",
+#                        code=201,
+#                        message=str(e))
 
 
 def read_query_db(query, args=()):
