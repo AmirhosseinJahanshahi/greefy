@@ -142,11 +142,20 @@ def user_update_playlist(old_title, new_title):
     return response
 
 
-@app.route('/api/v1.0/user_edit_playlist/<int:playlist_id>/<int:music_id>/<int:user_id>', methods=['GET'])
-def user_delete_playlist(playlist_id, music_id, user_id):
+@app.route('/api/v1.0/user_delete_music_from_album/<int:album_id>/<int:music_id>', methods=['GET'])
+def user_delete_music_from_album(album_id, music_id):
     response = cud_query_db(
-        "DELETE FROM playlist_has_music WHERE  playlist_id = (%s) AND music_id = (%s) AND user_id = (%s)",
-        (playlist_id, music_id, user_id,))
+        "DELETE FROM music WHERE  album_id = (%s) AND music_id = (%s)",
+        (album_id, music_id,))
+    return response
+
+
+@app.route('/api/v1.0/user_delete_music_from_album/<int:album_id>', methods=['GET'])
+def user_delete_album(album_id):
+    #TODO
+    response = cud_query_db(
+        "DELETE FROM album WHERE  album_id = (%s)",
+        (album_id,))
     return response
 
 
@@ -205,7 +214,7 @@ def listener_login():
                        message="login error!")
 
 
-@app.route('/api/v1.0/listener_sign_up', methods=['POST'])
+@app.route('/api/v1.0/listener_signup', methods=['POST'])
 def listener_signup():
     data = request.get_json()
     username = data.get('username', '')
@@ -238,9 +247,8 @@ def change_user_to_premium(user_id, days, credit_card, credit_expiration):
     return response
 
 
-
-@app.route('/api/v1.0/artist_sign_up_accept', methods=['POST'])
-def artist_signup_accept():
+@app.route('/api/v1.0/artist_signup', methods=['POST'])
+def artist_signup():
     data = request.get_json()
     username = data.get('username', '')
     email = data.get('email', '')
@@ -253,7 +261,12 @@ def artist_signup_accept():
     response = cud_query_db(
         "INSERT INTO artist (username,email,password,artistic_name,start_date,nationality,q_number,q_value) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
         (username, email, password, artistic_name, start_date, nationality, q_number, q_value))
-    return response
+    artist_id = read_field_query_db("SELECT artist_id FROM artist WHERE username = (%s) AND email = (%s)",
+                                    (username, email))
+    add_to_waited_artist = cud_query_db(
+        "INSERT INTO waiting_artist (waitingartist_id) VALUES (%s)",
+        (artist_id,))
+    return add_to_waited_artist
 
 
 def hash_password(password):
