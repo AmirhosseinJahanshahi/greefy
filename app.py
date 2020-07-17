@@ -14,8 +14,8 @@ mail_settings = {
     "MAIL_PORT": 465,
     "MAIL_USE_TLS": False,
     "MAIL_USE_SSL": True,
-    "MAIL_USERNAME": "",
-    "MAIL_PASSWORD": ""
+    "MAIL_USERNAME": "greefy.com@gmail.com",
+    "MAIL_PASSWORD": "$greefy$__co"
 }
 app.config.update(mail_settings)
 mail = Mail(app)
@@ -24,7 +24,7 @@ app.config['JSON_SORT_KEYS'] = False
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
-app.config['MYSQL_DB'] = 'spotify'
+app.config['MYSQL_DB'] = 'fsglsvyacbsucrjm'
 mysql = MySQL(app)
 bcrypt = Bcrypt()
 
@@ -308,7 +308,7 @@ def get_last_music_followers_play(user_id):
 #     return str(final_list)
 
 
-@app.route('/send_email')
+@app.route('/api/v1.0/send_email', methods=['POST'])
 def send_email():
     try:
         data = request.get_json()
@@ -321,7 +321,7 @@ def send_email():
             (subject, recipient_email, recipient_username, body,))
         msg = mail.send_message(
             subject,
-            sender='ri******a@gmail.com',
+            sender='greefy.co@gmail.com',
             recipients=[recipient_email],
             body=body
         )
