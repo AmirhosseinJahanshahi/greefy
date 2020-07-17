@@ -5,8 +5,21 @@ from flask import request
 import datetime
 from flask_bcrypt import Bcrypt
 import json
+from flask_mail import Mail
+from flask_mail import Message
 
 app = Flask(__name__)
+mail_settings = {
+    "MAIL_SERVER": 'smtp.gmail.com',
+    "MAIL_PORT": 465,
+    "MAIL_USE_TLS": False,
+    "MAIL_USE_SSL": True,
+    "MAIL_USERNAME": "",
+    "MAIL_PASSWORD": ""
+}
+app.config.update(mail_settings)
+mail = Mail(app)
+
 app.config['JSON_SORT_KEYS'] = False
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
@@ -191,16 +204,30 @@ def search(search_text):
 
 # ------------------------------User------------------------------ #
 @app.route('/api/v1.0/user_follows/<int:first_user_id>/<int:second_user_id>', methods=['GET'])
-def user_follow(first_user_id, second_user_id):
+def user_follows(first_user_id, second_user_id):
     response = cud_query_db("INSERT INTO user_follows (firstuser_id,seconduser_id) VALUES (%s,%s)",
                             (first_user_id, second_user_id))
     return response
 
 
+@app.route('/api/v1.0/user_follows_artist/<int:user_id>/<int:artist_id>', methods=['GET'])
+def user_follows_artist(user_id, artist_id):
+    response = cud_query_db("INSERT INTO user_follows_artist (user_id,artist_id) VALUES (%s,%s)",
+                            (user_id, artist_id))
+    return response
+
+
 @app.route('/api/v1.0/user_unfollows/<int:first_user_id>/<int:second_user_id>', methods=['GET'])
-def user_unfollow(first_user_id, second_user_id):
+def user_unfollows(first_user_id, second_user_id):
     response = cud_query_db("DELETE FROM user_follows WHERE firstuser_id = %s AND seconduser_id = %s",
                             (first_user_id, second_user_id))
+    return response
+
+
+@app.route('/api/v1.0/user_unfollows_artist/<int:user_id>/<int:artist_id>', methods=['GET'])
+def user_unfollows_artist(user_id, artist_id):
+    response = cud_query_db("DELETE FROM user_follows_artist WHERE user_id = %s AND artist_id = %s",
+                            (user_id, artist_id))
     return response
 
 
@@ -259,6 +286,54 @@ def get_last_music_followers_play(user_id):
         if final_result['code'] == 200:
             final_list.append(final_result['content'])
     return str(final_list)
+
+
+# TODO
+# @app.route('/api/v1.0/get_five_music_from_artist/<int:user_id>', methods=['GET'])
+# def get_five_music_from_artist(user_id):
+#     response = read_query_db("SELECT artist_id FROM user_follows_artist WHERE user_id = (%s)",
+#                              (user_id,))
+#     result = json.loads(response.get_data().decode("utf-8"))['content']
+#     temp = list()
+#     final_list = list()
+#     for x in result:
+#         temp.append(x['artist_id'])
+#     for i in range(len(temp)):
+#         find_music = read_query_db(
+#             "SELECT id FROM album WHERE artist_id = (%s) AND release_date IN (SELECT max(music_date_played) FROM user_plays_music) ORDER BY music_time_played desc limit 5"
+#             , (temp.__getitem__(i),))
+#         final_result = json.loads(find_music.get_data().decode("utf-8"))
+#         if final_result['code'] == 200:
+#             final_list.append(final_result['content'])
+#     return str(final_list)
+
+
+@app.route('/send_email')
+def send_email():
+    try:
+        data = request.get_json()
+        subject = data.get('subject', '')
+        recipient_email = data.get('recipient_email', '')
+        recipient_username = data.get('recipient_username', '')
+        body = data.get('body', '')
+        response = cud_query_db(
+            "INSERT INTO mail (subject,recipient_email,recipient_username,body) VALUES (%s,%s,%s,%s)",
+            (subject, recipient_email, recipient_username, body,))
+        msg = mail.send_message(
+            subject,
+            sender='ri******a@gmail.com',
+            recipients=[recipient_email],
+            body=body
+        )
+        mail.send(msg)
+        return jsonify(status="success",
+                       code=200,
+                       message="done!",
+                       )
+    except Exception as e:
+        return jsonify(status="failed",
+                       code=201,
+                       message=str(e))
 
 
 # ------------------------------EndUser------------------------------ #
