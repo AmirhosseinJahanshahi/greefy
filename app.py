@@ -361,13 +361,6 @@ def show_artist_to_admin():
     return response
 
 
-@app.route('/api/v1.0/get_user_info/<int:user_id>', methods=['GET'])
-def get_user_info(user_id):
-    response = read_query_db(
-        "SELECT a.artist_id FROM artist as a INNER JOIN album as al ON al.artist_id = a.artist_id GROUP BY a.artist_id ORDER BY count(a.artist_id)")
-    return response
-
-
 @app.route('/api/v1.0/find_artist_fans/artist_id=<int:artist_id>&artist_genre=<artist_genre>&user_genre=<user_genre>',
            methods=['GET'])
 def find_artist_fans(artist_id, artist_genre, user_genre):
@@ -436,7 +429,6 @@ def user_delete_music_from_album(album_id, music_id):
 
 @app.route('/api/v1.0/user_delete_music_from_album/<int:album_id>', methods=['GET'])
 def user_delete_album(album_id):
-    # TODO
     response = cud_query_db(
         "DELETE FROM album WHERE  album_id = (%s)",
         (album_id,))
@@ -532,12 +524,40 @@ def verify_password(stored_password, provided_password):
     return bcrypt.check_password_hash(stored_password, provided_password)
 
 
-@app.route('/api/v1.0/user_remember_password', methods=['POST'])
-def user_remember_password():
-    # TODO
-    data = request.form
-    username = data.get('username')
-    return username
+@app.route('/api/v1.0/listener_remember_password/username=<username>&q_value=<q_value>', methods=['GET'])
+def listener_remember_password(username,q_value):
+    cur = mysql.connection.cursor()
+    cur.execute(
+        "SELECT * FROM listener WHERE username = (%s) AND q_value = (%s) ",
+        (username,q_value,))
+    mysql.connection.commit()
+    if cur.rowcount <= 0:
+        listener_message = jsonify(status="failed",
+                                   code=201,
+                                   message="No data found!")
+    else:
+        listener_message = jsonify(status="success",
+                                   code=200,
+                                   message="done!")
+    return listener_message
+
+
+@app.route('/api/v1.0/artist_remember_password/username=<username>&q_value=<q_value>', methods=['GET'])
+def artist_remember_password(username,q_value):
+    cur = mysql.connection.cursor()
+    cur.execute(
+        "SELECT * FROM artist WHERE username = (%s) AND q_value = (%s) ",
+        (username,q_value,))
+    mysql.connection.commit()
+    if cur.rowcount <= 0:
+        artist_message = jsonify(status="failed",
+                                   code=201,
+                                   message="No data found!")
+    else:
+        artist_message = jsonify(status="success",
+                                   code=200,
+                                   message="done!")
+    return artist_message
 
 
 @app.route('/api/v1.0/listener_update_account/<int:user_id>', methods=['POST'])
