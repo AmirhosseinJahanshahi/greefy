@@ -24,7 +24,7 @@ app.config['JSON_SORT_KEYS'] = False
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
-app.config['MYSQL_DB'] = 'fsglsvyacbsucrjm'
+app.config['MYSQL_DB'] = 'greefy'
 mysql = MySQL(app)
 bcrypt = Bcrypt()
 
@@ -288,24 +288,35 @@ def get_last_music_followers_play(user_id):
     return str(final_list)
 
 
-# TODO
-# @app.route('/api/v1.0/get_five_music_from_artist/<int:user_id>', methods=['GET'])
-# def get_five_music_from_artist(user_id):
-#     response = read_query_db("SELECT artist_id FROM user_follows_artist WHERE user_id = (%s)",
-#                              (user_id,))
-#     result = json.loads(response.get_data().decode("utf-8"))['content']
-#     temp = list()
-#     final_list = list()
-#     for x in result:
-#         temp.append(x['artist_id'])
-#     for i in range(len(temp)):
-#         find_music = read_query_db(
-#             "SELECT id FROM album WHERE artist_id = (%s) AND release_date IN (SELECT max(music_date_played) FROM user_plays_music) ORDER BY music_time_played desc limit 5"
-#             , (temp.__getitem__(i),))
-#         final_result = json.loads(find_music.get_data().decode("utf-8"))
-#         if final_result['code'] == 200:
-#             final_list.append(final_result['content'])
-#     return str(final_list)
+@app.route('/api/v1.0/get_five_music_from_artist/<int:user_id>', methods=['GET'])
+def get_five_music_from_artist(user_id):
+    response = read_query_db(
+        "SELECT music.id FROM music INNER JOIN album ON music.album_id = album.id INNER JOIN user_follows_artist on album.artist_id = user_follows_artist.artist_id WHERE user_follows_artist.user_id = (%s) LIMIT 5",
+        (user_id,))
+    return response
+
+
+@app.route('/api/v1.0/get_five_music_week_popular', methods=['GET'])
+def get_five_music_week_popular():
+    response = read_query_db(
+        "select u.music_id from user_plays_music as u inner join user_likes_music as ul on u.music_id = ul.music_id group by u.music_id order by count(u.music_id) limit 5")
+    return response
+
+
+@app.route('/api/v1.0/get_user_popular_genre/<int:user_id>', methods=['GET'])
+def get_user_popular_genre(user_id):
+    response = read_query_db(
+        "SELECT count(genre) FROM listener as l INNER JOIN user_plays_music as u ON l.id = u.user_id INNER JOIN music as m ON m.id = u.music_id INNER JOIN album as a ON a.id = m.album_id WHERE l.id = (%s) GROUP BY genre"
+        , (user_id,))
+    return response
+
+
+@app.route('/api/v1.0/get_artist_music_number_in_genre/<int:artist_id>', methods=['GET'])
+def get_artist_music_number_in_genre(artist_id):
+    response = read_query_db(
+        "SELECT count(genre) FROM artist as a INNER JOIN album as al ON a.artist_id = al.artist_id INNER JOIN music as m ON m.album_id = al.id WHERE a.artist_id = (%s) GROUP BY genre"
+        , (artist_id,))
+    return response
 
 
 @app.route('/api/v1.0/send_email', methods=['POST'])
