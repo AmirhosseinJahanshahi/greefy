@@ -201,6 +201,14 @@ def get_playlist_musics(playlist_id):
     return response
 
 
+@app.route('/api/v1.0/get_playlist_popular_genre/<int:playlist_id>', methods=['GET'])
+def get_playlist_popular_genre(playlist_id):
+    response = read_query_db(
+        "SELECT count(genre) FROM playlist as p INNER JOIN playlist_has_music as ps ON p.id = ps.playlist_id INNER JOIN music as m ON ps.music_id = m.id INNER JOIN album as a ON m.album_id = a.id WHERE p.id = (%s) GROUP BY genre",
+        (playlist_id,))
+    return response
+
+
 # ------------------------------EndPlaylist------------------------------ #
 
 # ------------------------------Search------------------------------ #
@@ -328,6 +336,40 @@ def get_artist_music_number_in_genre(artist_id):
         "SELECT count(genre) FROM artist as a INNER JOIN album as al ON a.artist_id = al.artist_id INNER JOIN music as m ON m.album_id = al.id WHERE a.artist_id = (%s) GROUP BY genre"
         , (artist_id,))
     return response
+
+
+@app.route('/api/v1.0/suggest_music_to_user/playlist_id=<int:playlist_id>&genre=<genre>', methods=['GET'])
+def suggest_music_to_user(playlist_id, genre):
+    response = read_query_db(
+        "SELECT m.id FROM music as m INNER JOIN album as a ON m.album_id = a.id WHERE a.genre = (%s) AND NOT EXISTS (SELECT * FROM playlist_has_music as p WHERE p.playlist_id = (%s) AND p.music_id = m.id) ORDER BY RAND() LIMIT 2",
+        (genre, playlist_id,))
+    return response
+
+
+@app.route('/api/v1.0/find_artist_fans/artist_id=<int:artist_id>&artist_genre=<artist_genre>&user_genre=<user_genre>',
+           methods=['GET'])
+def find_artist_fans(artist_id, artist_genre, user_genre):
+    if check_genre(artist_genre, user_genre):
+        response = read_query_db(
+            "SELECT l.id FROM listener as l INNER JOIN user_plays_music as u ON l.id = u.user_id INNER JOIN music as m ON u.music_id = m.id INNER JOIN album as a ON a.id = m .album_id WHERE count(l.id) > 9 AND a.artist_id = (%s)",
+            (artist_id,))
+        return response
+    else:
+        return failed_genres(artist_genre, user_genre)
+
+
+def check_genre(artist_genre, user_genre):
+    if artist_genre == user_genre:
+        return True
+    else:
+        return False
+
+
+def failed_genres(artist_genre, user_genre):
+    if artist_genre != user_genre:
+        return jsonify(status="failed",
+                       code=201,
+                       message="artist_genre is not equal to user_genre")
 
 
 @app.route('/api/v1.0/send_email', methods=['POST'])
@@ -470,6 +512,7 @@ def verify_password(stored_password, provided_password):
 
 @app.route('/api/v1.0/user_remember_password', methods=['POST'])
 def user_remember_password():
+    # TODO
     data = request.form
     username = data.get('username')
     return username
