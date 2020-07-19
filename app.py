@@ -1,4 +1,5 @@
 from flask import Flask
+from flask import render_template
 from flask import jsonify
 from flask_mysqldb import MySQL
 from flask import request
@@ -24,9 +25,19 @@ app.config['JSON_SORT_KEYS'] = False
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
-app.config['MYSQL_DB'] = 'fsglsvyacbsucrjm'
+app.config['MYSQL_DB'] = 'greefy'
 mysql = MySQL(app)
 bcrypt = Bcrypt()
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/login.html')
+def login():
+    return render_template('login.html')
 
 
 # ------------------------------Music------------------------------ #
