@@ -346,6 +346,28 @@ def suggest_music_to_user(playlist_id, genre):
     return response
 
 
+@app.route('/api/v1.0/suggest_album_to_user/<nationality>', methods=['GET'])
+def suggest_album_to_user(nationality):
+    response = read_query_db(
+        "SELECT a.id FROM album as a INNER JOIN artist as ar ON a.artist_id = ar.artist_id WHERE ar.nationality = (%s)",
+        (nationality,))
+    return response
+
+
+@app.route('/api/v1.0/show_artist_to_admin', methods=['GET'])
+def show_artist_to_admin():
+    response = read_query_db(
+        "SELECT a.artist_id FROM artist as a INNER JOIN album as al ON al.artist_id = a.artist_id GROUP BY a.artist_id ORDER BY count(a.artist_id)")
+    return response
+
+
+@app.route('/api/v1.0/get_user_info/<int:user_id>', methods=['GET'])
+def get_user_info(user_id):
+    response = read_query_db(
+        "SELECT a.artist_id FROM artist as a INNER JOIN album as al ON al.artist_id = a.artist_id GROUP BY a.artist_id ORDER BY count(a.artist_id)")
+    return response
+
+
 @app.route('/api/v1.0/find_artist_fans/artist_id=<int:artist_id>&artist_genre=<artist_genre>&user_genre=<user_genre>',
            methods=['GET'])
 def find_artist_fans(artist_id, artist_genre, user_genre):
@@ -518,20 +540,46 @@ def user_remember_password():
     return username
 
 
-@app.route('/api/v1.0/user_update_account', methods=['POST'])
-def user_update_account():
-    # TODO
-    data = request.form
-    username = data.get('username')
-    return username
+@app.route('/api/v1.0/listener_update_account/<int:user_id>', methods=['POST'])
+def listener_update_account(user_id):
+    data = request.get_json()
+    email = data.get('email', '')
+    password = hash_password(data.get('password', ''))
+    first_name = data.get('first_name', '')
+    last_name = data.get('last_name', '')
+    birth_year = data.get('birth_year', '')
+    nationality = data.get('nationality', '')
+    response = cud_query_db(
+        "UPDATE listener SET email = (%s),password = (%s),first_name = (%s),last_name = (%s),birth_year (%s),nationality = (%s) WHERE id = (%s)",
+        (email, password, first_name, last_name, birth_year, nationality, user_id))
+    return response
 
 
-@app.route('/api/v1.0/user_delete_account', methods=['POST'])
-def user_delete_account():
-    # TODO
-    data = request.form
-    username = data.get('username')
-    return username
+@app.route('/api/v1.0/artist_update_account/<int:user_id>', methods=['POST'])
+def artist_update_account(user_id):
+    data = request.get_json()
+    email = data.get('email', '')
+    password = hash_password(data.get('password', ''))
+    artistic_name = data.get('artistic_name', '')
+    nationality = data.get('nationality', '')
+    response = cud_query_db(
+        "UPDATE artist SET email = (%s),password = (%s),artistic_name = (%s),nationality = (%s) WHERE id = (%s)",
+        (email, password, artistic_name, nationality, user_id))
+    return response
+
+
+@app.route('/api/v1.0/listener_delete_account/<int:user_id>', methods=['GET'])
+def listener_delete_account(user_id):
+    response = cud_query_db("DELETE FROM listener WHERE id = (%s)",
+                            (user_id,))
+    return response
+
+
+@app.route('/api/v1.0/artist_delete_account/<int:user_id>', methods=['GET'])
+def artist_delete_account(user_id):
+    response = cud_query_db("DELETE FROM artist WHERE artist_id = (%s)",
+                            (user_id,))
+    return response
 
 
 # ------------------------------EndLogin&Signup------------------------------ #
@@ -565,10 +613,6 @@ def change_user_to_free(user_id):
         "WHERE id = (%s)",
         (0, "", "", "", user_id))
     return response
-
-
-# TODO
-# subtract premium days
 
 
 # ------------------------------EndPremium------------------------------ #
@@ -671,74 +715,7 @@ def search_query_db(search_text):
                        message=str(e))
 
 
-# TODO
-# def user_info_query_db(user_id, username, email):
-#     try:
-#         cur = mysql.connection.cursor()
-#         # user query
-#         cur.execute("SELECT username, first_name FROM listener WHERE username = (%s) AND email = (%s)",
-#                     (username, email))
-#         user_result = cur.fetchall()
-#         mysql.connection.commit()
-#         if cur.rowcount <= 0:
-#             user_message = "No data found!"
-#         else:
-#             user_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
-#                                 user_result]
-#         # following query
-#         cur.execute("SELECT seconduser_id FROM user_follows WHERE firstuser_id = (%s)",
-#                     (user_id,))
-#         following_result = cur.fetchall()
-#         mysql.connection.commit()
-#         if cur.rowcount <= 0:
-#             following_message = "No data found!"
-#         else:
-#             following_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
-#                               following_result]
-#         # follower query
-#         cur.execute("SELECT firstuser_id FROM user_follows WHERE seconduser_id = (%s)",
-#                     (user_id,))
-#         follower_result = cur.fetchall()
-#         mysql.connection.commit()
-#         if cur.rowcount <= 0:
-#             follower_message = "No data found!"
-#         else:
-#             follower_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
-#                              follower_result]
-#         # playlist query
-#         cur.execute("SELECT playlist_id FROM user_creates_playlist WHERE user_id = (%s)",
-#                     (user_id,))
-#         playlist_result = cur.fetchall()
-#         mysql.connection.commit()
-#         if cur.rowcount <= 0:
-#             playlist_message = "No data found!"
-#         else:
-#             playlist_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
-#                              playlist_result]
-#         # playlist_music query
-#         cur.execute("SELECT music_id, user_id FROM playlist_has_music WHERE playlist_id = (%s)",
-#                     (search_text,))
-#         playlist_result = cur.fetchall()
-#         mysql.connection.commit()
-#         if cur.rowcount <= 0:
-#             playlist_message = "No data found!"
-#         else:
-#             playlist_message = [{cur.description[index][0]: column for index, column in enumerate(value)} for value in
-#                                 playlist_result]
-#         cur.close()
-#         return jsonify(status="success",
-#                        code=200,
-#                        message="done!",
-#                        listener=listener_message,
-#                        artist=artist_message,
-#                        music=music_message,
-#                        album=album_message,
-#                        playlist=playlist_message, )
-#     except Exception as e:
-#         cur.close()
-#         return jsonify(status="failed",
-#                        code=201,
-#                        message=str(e))
+
 
 
 def read_query_db(query, args=()):
